@@ -1,0 +1,32 @@
+{
+  "name": "@thecannery/hoist",
+  "version": "0.0.1",
+  "description": "DIY Static Website Hosting",
+  "main": "index.js",
+  "repository": "git@github.com:amiller-gh/hoist.git",
+  "author": "Adam Miller <adam@pages.me>",
+  "license": "MIT",
+  "bin": {
+    "hoist": "./index.js"
+  },
+  "dependencies": {
+    "@google-cloud/storage": "^3.5.0",
+    "@google-cloud/vision": "^0.23.0",
+    "@icon-magic/imagemin-farm": "^0.0.2",
+    "buffer-replace": "^1.0.0",
+    "cli-progress": "^2.1.0",
+    "debug": "^4.1.0",
+    "dotenv": "^6.2.0",
+    "fs-extra": "^7.0.1",
+    "glob": "^7.1.3",
+    "google-cloud-bucket": "^0.14.7",
+    "iltorb": "^2.4.3",
+    "image-size": "^0.7.1",
+    "imagemin-gifsicle": "^6.0.1",
+    "imagemin-mozjpeg": "^8.0.0",
+    "imagemin-pngquant": "^8.0.0",
+    "imagemin-webp": "^5.1.0",
+    "node-fetch": "^2.3.0",
+    "node-gzip": "^1.1.2"
+  }
+}
