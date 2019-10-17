@@ -11,8 +11,6 @@
   },
   "dependencies": {
     "@google-cloud/storage": "^3.5.0",
-    "@google-cloud/vision": "^0.23.0",
-    "@icon-magic/imagemin-farm": "^0.0.2",
     "buffer-replace": "^1.0.0",
     "cli-progress": "^2.1.0",
     "debug": "^4.1.0",
