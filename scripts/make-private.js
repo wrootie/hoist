@@ -1,25 +1,12 @@
 #!/usr/bin/env node
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-const { gzip } = require('node-gzip');
+const findUp = require('find-up');
 const { client } = require('google-cloud-bucket');
-const { promisify } = require('util');
-const glob = promisify(require('glob'));
 
-const BUCKET = 'petergallotta.org';
-const jsonKeyFile = path.join(__dirname, './gcloud.json');
-const storage = client.new({ jsonKeyFile });
+module.exports = async function down(cwd){
 
-const CWD = process.cwd();
-
-const CACHE_PATH = path.join(__dirname, '.file-cache.json');
-let cache = {};
-if (fs.existsSync(CACHE_PATH)) {
-  cache = JSON.parse(fs.readFileSync(CACHE_PATH));
-}
-
-module.exports = async function down(){
+  const jsonKeyFile = await findUp('gcloud.json', { cwd });
+  const BUCKET = JSON.parse(fs.readFileSync(jsonKeyFile)).bucket;
+  const storage = client.new({ jsonKeyFile });
 
   let exists = await storage.exists(BUCKET);
   console.log(exists ? 'Bucket exists.' : 'Bucket does not exist.');
