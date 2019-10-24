@@ -1,5 +1,5 @@
 {
-  "name": "@thecannery/hoist",
+  "name": "@cannery/hoist",
   "version": "0.0.1",
   "description": "DIY Static Website Hosting",
   "main": "index.js",
