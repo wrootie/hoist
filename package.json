@@ -1,6 +1,6 @@
 {
   "name": "@cannery/hoist",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "DIY Static Website Hosting",
   "main": "index.js",
   "repository": "git@github.com:amiller-gh/hoist.git",
@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@google-cloud/storage": "^3.5.0",
+    "autoprefixer": "^9.7.1",
     "buffer-replace": "^1.0.0",
     "cli-progress": "^2.1.0",
     "cssnano": "^4.1.10",

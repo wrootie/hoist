@@ -9,8 +9,8 @@ if (args[0] === 'down') {
   require('./scripts/make-private')(dir);
 }
 else if (args[0] === 'up') {
+  if (args[1]) {
+    require('./scripts/deploy')(dir);
+  }
   require('./scripts/make-public')(dir);
-}
-else if (args[0] === 'deploy') {
-  require('./scripts/deploy')(dir);
 }

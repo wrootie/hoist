@@ -13,6 +13,7 @@ const imageminGifsicle = require('imagemin-gifsicle');
 const imageminWebp = require('imagemin-webp');
 const postcss = require('postcss');
 const cssnano = require('cssnano');
+const autoprefixer = require('autoprefixer')
 const Terser = require("terser");
 const brotli = require('iltorb');
 
@@ -201,7 +202,7 @@ module.exports = async function deploy(workingDir) {
           // Minify and upload sourcemaps for CSS resources.
           if (extname === '.css') {
             const bareRemoteName = path.format(remoteName);
-            const res = await postcss([cssnano]).process(buffer, {
+            const res = await postcss([autoprefixer, cssnano]).process(buffer, {
               from: filePath,
               to: bareRemoteName,
               map: { inline: false },

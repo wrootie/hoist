@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const fs = require('fs');
 const findUp = require('find-up');
 const { client } = require('google-cloud-bucket');
 
