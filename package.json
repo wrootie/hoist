@@ -1,6 +1,6 @@
 {
   "name": "@cannery/hoist",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "DIY Static Website Hosting",
   "main": "index.js",
   "repository": "git@github.com:amiller-gh/hoist.git",
