@@ -14,7 +14,8 @@ const imageminWebp = require('imagemin-webp');
 const postcss = require('postcss');
 const cssnano = require('cssnano');
 const autoprefixer = require('autoprefixer')
-const Terser = require("terser");
+const Terser = require('terser');
+const htmlMinifier = require('html-minifier')
 const brotli = require('iltorb');
 
 const IMG_EXTS = {
@@ -76,7 +77,6 @@ async function generateWebp(file, input, BUCKET) {
 
 function generateSourceMapFile(filePath, remoteName, content, BUCKET) {
   remoteName = path.join(BUCKET, remoteName) + '.map';
-  console.log(remoteName, content);
   const buffer = Buffer.from(content);
   return {
     filePath,
@@ -180,10 +180,31 @@ module.exports = async function deploy(workingDir) {
               remoteName.base = remoteName.name;
               delete remoteName.extname;
             }
+
+            // Minify HTML
+            buffer = Buffer.from(htmlMinifier.minify(buffer.toString(), {
+              caseSensitive: true,
+              collapseBooleanAttributes: true,
+              collapseInlineTagWhitespace: false,
+              continueOnParseError: true,
+              collapseWhitespace: true,
+              decodeEntities: true,
+              minifyCSS: true,
+              minifyJS: true,
+              removeAttributeQuotes: true,
+              quoteCharacter: `"`,
+              removeAttributeQuotes: true,
+              removeComments: true,
+              removeScriptTypeAttributes: true,
+              removeStyleLinkTypeAttributes: true,
+              sortAttributes: true,
+              sortClassName: true,
+              useShortDoctype: true,
+            }));
           }
 
           // Otherwise, if not a well known file, use the hash value as its name for CDN cache busting.
-          else if (!WELL_KNOWN[remoteName.base] && filePath.indexOf('.well-known') !== 0){
+          else if (!WELL_KNOWN[remoteName.base] && filePath.indexOf('.well-known') !== 0) {
             remoteName.base = hash;
             delete remoteName.extname;
           }
