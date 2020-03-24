@@ -9,9 +9,9 @@ module.exports = async function up(cwd){
   const BUCKET = JSON.parse(fs.readFileSync(jsonKeyFile)).bucket;
   const storage = client.new({ jsonKeyFile });
 
-  let exists = await storage.exists(BUCKET);
-  console.log(exists ? 'Bucket exists.' : 'Bucket does not exist.');
-  if (!exists) { return; }
+  if (!await storage.exists(BUCKET)) {
+    await storage.bucket(BUCKET).create({ location: 'us-west1' });
+  }
 
   // CONFIGURE CORS ON A BUCKET (warning: Your service account must have the 'roles/storage.admin' role)
   const bucket = storage.bucket(BUCKET);

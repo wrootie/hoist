@@ -3,8 +3,6 @@ const path = require('path');
 const args = process.argv.slice(2);
 const dir = path.join(process.cwd(), args[1] || '');
 
-console.log(dir, args);
-
 if (args[0] === 'down') {
   require('./scripts/make-private')(dir);
 }
@@ -13,4 +11,10 @@ else if (args[0] === 'up') {
     require('./scripts/deploy')(dir);
   }
   require('./scripts/make-public')(dir);
+}
+else if (args[0] === 'serve') {
+  if (!args[1]) {
+    return console.error('Directory required.');
+  }
+  require('./scripts/serve')(dir, args[2]);
 }

@@ -17,6 +17,11 @@ const autoprefixer = require('autoprefixer')
 const Terser = require('terser');
 const htmlMinifier = require('html-minifier')
 const brotli = require('iltorb');
+const cliProgress = require('cli-progress');
+
+const progress = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+
+const DELETE_FILENAME = '.hoist-delete';
 
 const IMG_EXTS = {
   '.png': 'image/png',
@@ -82,7 +87,7 @@ function generateSourceMapFile(filePath, remoteName, content, BUCKET) {
     filePath,
     remoteName,
     buffer,
-    contentType: 'application/json  ',
+    contentType: 'application/json',
     contentEncoding: undefined,
     cacheControl: 'public,max-age=31536000,immutable',
   };
@@ -100,6 +105,7 @@ module.exports = async function deploy(workingDir) {
 
   // CONFIGURE CORS ON A BUCKET (warning: Your service account must have the 'roles/storage.admin' role)
   const bucket = storage.bucket(BUCKET);
+
   await bucket.cors.setup({
     origin: ['*'],
     method: ['GET', 'OPTIONS', 'HEAD', 'POST'],
@@ -121,7 +127,15 @@ module.exports = async function deploy(workingDir) {
     });
   }
 
-  let files = await glob(path.join(workingDir, '**/*'));
+  const NOW = Date.now();
+  let toDelete = {};
+  try {
+    toDelete = await bucket.object(DELETE_FILENAME).get();
+  } catch(_err) {}
+  toDelete = toDelete || {};
+  remoteObjects.delete(path.join(BUCKET, DELETE_FILENAME));
+
+  const files = await glob(path.join(workingDir, '**/*'));
   let iter = 0;
   const THREAD_COUNT = 12;
   const threads = [];
@@ -137,10 +151,11 @@ module.exports = async function deploy(workingDir) {
     hashes[file] = fileNameHash(buffers[file]);
   }
 
-  let count = 0;
+  let uploadCount = 0;
+  let errorCount = 0;
   const entries = Object.entries(buffers);
 
-  async function upload({ filePath, remoteName, buffer, hash, contentType, contentEncoding, cacheControl }) {
+  async function upload({ filePath, remoteName, buffer, contentType, contentEncoding, cacheControl }) {
     let opts = {
       timeout: 520000,
       headers: {
@@ -152,15 +167,27 @@ module.exports = async function deploy(workingDir) {
 
     // Upload it!
     await storage.insert(buffer, remoteName, opts).then(() => {
-      console.log(`(${++count}/${entries.length}) Uploaded ${filePath}.`);
-    }, (err) => console.log(err.message));
+      uploadCount++;
+      // console.log(`(${uploadCount}/${entries.length}) Uploaded ${filePath}.`);
+    }, (err) => {
+      console.error(err.message);
+      errorCount++;
+    });
+
+    progress.update(uploadCount + errorCount);
 
     // Remove this item from our remote objects map so we don't delete if we cleanup.
-    remoteObjects.delete(remoteName);
-
+    if (remoteObjects.has(remoteName)) {
+      const obj = remoteObjects.get(remoteName);
+      remoteObjects.delete(remoteName);
+      delete toDelete[obj.name];
+    }
   }
 
-  const allDone = new Promise((resolve) => {
+  await new Promise((resolve) => {
+    const oldNames = Object.keys(hashes).sort((a, b) => a.length > b.length ? -1 : 1);
+    progress.start(entries.length, uploadCount + errorCount);
+
     for (let [filePath, buffer] of entries) {
       const hash = hashes[filePath];
       const extname = path.extname(filePath);
@@ -204,19 +231,25 @@ module.exports = async function deploy(workingDir) {
           }
 
           // Otherwise, if not a well known file, use the hash value as its name for CDN cache busting.
-          else if (!WELL_KNOWN[remoteName.base] && filePath.indexOf('.well-known') !== 0) {
+          else if (!WELL_KNOWN[remoteName.base] && filePath.indexOf('.well-known') !== 0 && extname !== '.json') {
             remoteName.base = hash;
             delete remoteName.extname;
           }
 
           // Replace all Hash names in CSS and HTML files.
           if (extname === '.css' || extname === '.html') {
-            for (let [oldName, hash] of Object.entries(hashes)) {
+            for (let oldName of oldNames ) {
+              const hash = hashes[oldName];
               let hashName = path.parse(oldName);
               hashName.base = hash;
               delete hashName.extname;
               hashName = path.format(hashName);
-              buffer = replace(buffer, oldName, hashName);
+              buffer = replace(buffer, `/${oldName}`, `/${hashName}`);
+              const relativePath = path.relative(path.dirname(filePath), oldName);
+              if (relativePath) {
+                buffer = replace(buffer, `./${relativePath}`, `/${hashName}`);
+                buffer = replace(buffer, relativePath, `/${hashName}`);
+              }
             }
           }
 
@@ -249,8 +282,6 @@ module.exports = async function deploy(workingDir) {
             await upload(sourceMap);
             buffer = Buffer.from(res.code);
           }
-
-          // TODO: HTML Minification
 
           // If is an image, minify it.
           // If not an image, we gzip it.
@@ -301,31 +332,50 @@ module.exports = async function deploy(workingDir) {
             filePath,
             remoteName,
             buffer,
-            hash,
             contentType,
             contentEncoding,
             cacheControl,
           });
 
         } catch(err) {
-          console.log(`(${++count}/${entries.length}) Failed ${filePath}.`)
+          // console.log(`(${++count}/${entries.length}) Failed ${filePath}.`)
           console.log(err);
         }
 
         // If this is the last to process, resolve.
-        console.log(count, entries.length);
-        if (count === entries.length) { resolve(); }
+        if ((uploadCount + errorCount) === entries.length) { resolve(); }
       });
       iter++;
     }
   });
 
-  await allDone;
-  for (let [id, obj] of remoteObjects) {
-    console.log(id);
-    const object = await bucket.object(obj.name);
-    await object.delete();
+  let deletedCount = 0;
+  for (let [_id, obj] of remoteObjects) {
+    toDelete[obj.name] = toDelete[obj.name] || NOW;
+
+    // If file has been marked for deletion over three days ago, remove it from the server.
+    if (toDelete[obj.name] < (NOW - (1000 * 60 * 60 * 24 * 3))) {
+      const object = await bucket.object(obj.name);
+      await object.delete();
+      deletedCount++;
+      delete toDelete[obj.name];
+    }
   }
+
+  await upload({
+    buffer: Buffer.from(JSON.stringify(toDelete, null, 2)),
+    filePath: DELETE_FILENAME,
+    remoteName: path.join(BUCKET, DELETE_FILENAME),
+    contentType: 'application/json',
+    contentEncoding: undefined,
+    cacheControl: 'no-cache,no-store,max-age=0',
+  });
+
+  progress.stop();
+  console.log(`✅ ${uploadCount} items uploaded.`)
+  console.log(`⌛ ${Object.keys(toDelete).length} items queued for deletion.`);
+  console.log(`🚫 ${deletedCount} items deleted.`);
+  console.log(`❗ ${errorCount} items failed.`);
 
   // Return the URL where we just uploaded everything to.
   return `https://${BUCKET}`;
