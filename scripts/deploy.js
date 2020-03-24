@@ -130,10 +130,11 @@ module.exports = async function deploy(workingDir) {
   const NOW = Date.now();
   let toDelete = {};
   try {
-    toDelete = await bucket.object(DELETE_FILENAME).get();
+    toDelete = await storage.get(path.join(BUCKET, DELETE_FILENAME));
   } catch(_err) {}
   toDelete = toDelete || {};
   remoteObjects.delete(path.join(BUCKET, DELETE_FILENAME));
+  console.log(toDelete);
 
   const files = await glob(path.join(workingDir, '**/*'));
   let iter = 0;
@@ -156,13 +157,19 @@ module.exports = async function deploy(workingDir) {
   const entries = Object.entries(buffers);
 
   async function upload({ filePath, remoteName, buffer, contentType, contentEncoding, cacheControl }) {
+    const headers = {
+      'Content-Type': contentType,
+      'Content-Encoding': contentEncoding,
+      'Cache-Control': cacheControl,
+    };
+
+    if (!headers['Content-Type']) { delete headers['Content-Type']; }
+    if (!headers['Content-Encoding']) { delete headers['Content-Encoding']; }
+    if (!headers['Cache-Control']) { delete headers['Cache-Control']; }
+
     let opts = {
       timeout: 520000,
-      headers: {
-        'Content-Type': contentType,
-      },
-      cacheControl,
-      contentEncoding
+      headers,
     };
 
     // Upload it!
@@ -180,7 +187,7 @@ module.exports = async function deploy(workingDir) {
     if (remoteObjects.has(remoteName)) {
       const obj = remoteObjects.get(remoteName);
       remoteObjects.delete(remoteName);
-      delete toDelete[obj.name];
+      delete toDelete[fileNameHash(obj.name)];
     }
   }
 
@@ -200,9 +207,11 @@ module.exports = async function deploy(workingDir) {
           let remoteName = filePath;
           remoteName = path.parse(remoteName);
 
-          // If an HTML file, but not the index.html, remove the `.html` for a bare URLs look in the browser.
           if (remoteName.ext === '.html') {
+            // Never cache HTML files.
             cacheControl = 'no-cache,no-store,max-age=0';
+
+            // If an HTML file, but not the index.html, remove the `.html` for a bare URLs look in the browser.
             if (!WELL_KNOWN[remoteName.base]) {
               remoteName.base = remoteName.name;
               delete remoteName.extname;
@@ -351,23 +360,25 @@ module.exports = async function deploy(workingDir) {
 
   let deletedCount = 0;
   for (let [_id, obj] of remoteObjects) {
-    toDelete[obj.name] = toDelete[obj.name] || NOW;
+    const hashedName = fileNameHash(obj.name);
+    console.log(hashedName)
+    toDelete[hashedName] = toDelete[hashedName] || NOW;
 
     // If file has been marked for deletion over three days ago, remove it from the server.
-    if (toDelete[obj.name] < (NOW - (1000 * 60 * 60 * 24 * 3))) {
+    if (toDelete[hashedName] < (NOW - (1000 * 60 * 60 * 24 * 3))) {
       const object = await bucket.object(obj.name);
       await object.delete();
       deletedCount++;
-      delete toDelete[obj.name];
+      delete toDelete[hashedName];
     }
   }
 
   await upload({
-    buffer: Buffer.from(JSON.stringify(toDelete, null, 2)),
+    buffer: await gzip(Buffer.from(JSON.stringify(toDelete, null, 2)), { level: 8 }),
     filePath: DELETE_FILENAME,
     remoteName: path.join(BUCKET, DELETE_FILENAME),
     contentType: 'application/json',
-    contentEncoding: undefined,
+    contentEncoding: 'gzip',
     cacheControl: 'no-cache,no-store,max-age=0',
   });
 
