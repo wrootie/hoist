@@ -3,11 +3,13 @@ const fs = require('fs');
 const findUp = require('find-up');
 const { client } = require('google-cloud-bucket');
 
-module.exports = async function up(cwd){
+module.exports = async function up(cwd, bucket=null){
 
   const jsonKeyFile = await findUp('gcloud.json', { cwd });
-  const BUCKET = JSON.parse(fs.readFileSync(jsonKeyFile)).bucket;
+  const config = JSON.parse(fs.readFileSync(jsonKeyFile));
   const storage = client.new({ jsonKeyFile });
+
+  const BUCKET = bucket || config.bucket;
 
   if (!await storage.exists(BUCKET)) {
     await storage.bucket(BUCKET).create({ location: 'us-west1' });

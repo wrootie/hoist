@@ -10,7 +10,7 @@ module.exports = async function serve(cwd, usrPort){
     extensions: ['html', 'htm'],
   }));
 
-  const port = usrPort || await getPort();
+  const port = await getPort({ port: usrPort || 3000 });
   app.listen(port, () => console.log(`Static site serving on port ${port}!`));
 
   await open(`http://localhost:${port}`);

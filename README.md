@@ -25,18 +25,25 @@ All other files discovered are uploaded as-is to the hosting provider. All files
 Hoist comes with just two commands:
 
 ```bash
-$ hoist up [directory]
+$ hoist up [directory] [bucket_name]
 $ hoist down
+$ hoist serve directory [port]
 ```
 
 `hoist up` will make your site public to the world. If you pass a directory as the second CLI argument it will upload that directory to your production site.
 
 `hoist down` will make your site private, nobody will be able to see files in the Google Storage Bucket.
 
+`hoist serve` will serve your site locally for you to preview. If you pass a preferred port Hoist will use the provided port if available.
+
 ## Configuration
+When you run Hoist from the CLI, it will crawl up directories until it finds a `hoist.json` file with the Service Account Key and attempt to use it for authentication.
+
 Hoist needs a [Service Account](https://cloud.google.com/iam/docs/creating-managing-service-accounts) and a [Service Account Key](https://cloud.google.com/iam/docs/creating-managing-service-account-keys) with Storage Bucket management permissions to operate.
 
-When you run Hoist from the CLI, it will crawl up directories until it finds a `gcloud.json` file with the Service Account Key and attempt to use it for authentication. To configure the bucket that the site will upload to, add a single `bucket` field to this `gcloud.json` file with the target bucket name.
+You may optionally include a [`cloudflare_token`](https://dash.cloudflare.com/profile/api-tokens) to automatically clear your CDN cache on upload. This token must be granted `Zone.Zone` read access and `Zone.Cache Purge` permissions for relevant DNS Zones.
+
+To configure the bucket that the site will upload to by default, add a single `bucket` field to this `gcloud.json` file with the target bucket name.
 
 Once configured, your `gcloud.json` file should look something like this:
 
@@ -45,7 +52,7 @@ Once configured, your `gcloud.json` file should look something like this:
   "type": "service_account",
   "project_id": "projectid",
   "bucket": "bucketname.com",
-
+  "cloudflare_token": "01234567890123456789",
   "private_key_id": "01234567890123456789",
   "private_key": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
   "client_email": "name@projectid.iam.gserviceaccount.com",

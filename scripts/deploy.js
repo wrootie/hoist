@@ -22,6 +22,7 @@ const cliProgress = require('cli-progress');
 const progress = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
 
 const DELETE_FILENAME = '.hoist-delete';
+const CACHE_FILENAME = '.hoist-cache';
 
 const IMG_EXTS = {
   '.png': 'image/png',
@@ -53,9 +54,19 @@ const WELL_KNOWN = {
 
 // Compute the original file's base64url encoded hash
 // https://tools.ietf.org/html/rfc4648#section-5
-function fileNameHash(buffer) {
-  let hash = crypto.createHash('md5')
-  hash.update(buffer)
+function fileHash(buffer) {
+  let hash = crypto.createHash('md5');
+  hash.update(buffer);
+  hash = hash.digest('base64');
+  return hash.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+// Compute the original file's base64url encoded hash
+// https://tools.ietf.org/html/rfc4648#section-5
+function cacheHash(fileName, buffer) {
+  let hash = crypto.createHash('md5');
+  hash.update(Buffer.from(fileName));
+  hash.update(buffer);
   hash = hash.digest('base64');
   return hash.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
@@ -65,15 +76,13 @@ async function generateWebp(file, input, BUCKET) {
   remoteName.extname = '.webp';
   const filePath = path.format(remoteName)
   const buffer = await imageminWebp({ quality: 75 })(input);
-  const hash = fileNameHash(buffer);
-  remoteName.base = hash;
+  remoteName.base = fileHash(buffer);
   delete remoteName.extname;
   remoteName = path.format(remoteName);
   return {
     filePath,
     remoteName,
     buffer,
-    hash,
     contentType: 'image/webp',
     contentEncoding: undefined,
     cacheControl: 'public,max-age=31536000,immutable',
@@ -93,11 +102,13 @@ function generateSourceMapFile(filePath, remoteName, content, BUCKET) {
   };
 }
 
-module.exports = async function deploy(workingDir) {
+module.exports = async function deploy(workingDir, bucket=null) {
 
   const jsonKeyFile = await findUp('gcloud.json', { cwd: workingDir });
-  const BUCKET = JSON.parse(fs.readFileSync(jsonKeyFile)).bucket;
+  const config = JSON.parse(fs.readFileSync(jsonKeyFile));
   const storage = client.new({ jsonKeyFile });
+
+  const BUCKET = bucket || config.bucket;
 
   let exists = await storage.exists(BUCKET);
   console.log(exists ? 'Bucket exists.' : 'Bucket does not exist.');
@@ -129,12 +140,14 @@ module.exports = async function deploy(workingDir) {
 
   const NOW = Date.now();
   let toDelete = {};
+  let fileCache = new Set();
   try {
     toDelete = await storage.get(path.join(BUCKET, DELETE_FILENAME));
+    fileCache = new Set(await storage.get(path.join(BUCKET, CACHE_FILENAME)));
   } catch(_err) {}
   toDelete = toDelete || {};
+  fileCache = fileCache && fileCache.size ? fileCache : new Set();
   remoteObjects.delete(path.join(BUCKET, DELETE_FILENAME));
-  console.log(toDelete);
 
   const files = await glob(path.join(workingDir, '**/*'));
   let iter = 0;
@@ -149,14 +162,15 @@ module.exports = async function deploy(workingDir) {
     if (fs.statSync(filePath).isDirectory()) { continue; }
     let file = path.relative(workingDir, filePath);
     buffers[file] = fs.readFileSync(filePath);
-    hashes[file] = fileNameHash(buffers[file]);
+    hashes[file] = fileHash(buffers[file]);
   }
 
   let uploadCount = 0;
   let errorCount = 0;
   const entries = Object.entries(buffers);
 
-  async function upload({ filePath, remoteName, buffer, contentType, contentEncoding, cacheControl }) {
+  async function upload({ remoteName, buffer, contentType, contentEncoding, cacheControl }) {
+    const fileHashVal = fileHash(buffer);
     const headers = {
       'Content-Type': contentType,
       'Content-Encoding': contentEncoding,
@@ -172,10 +186,16 @@ module.exports = async function deploy(workingDir) {
       headers,
     };
 
+    const hash = cacheHash(remoteName, buffer);
+    delete toDelete[fileHash(buffer)];
+
+    // Only upload if the file does not exist on the server yet.
+    if (fileCache.has(hash)) { return; }
+    fileCache.add(hash);
+
     // Upload it!
     await storage.insert(buffer, remoteName, opts).then(() => {
       uploadCount++;
-      // console.log(`(${uploadCount}/${entries.length}) Uploaded ${filePath}.`);
     }, (err) => {
       console.error(err.message);
       errorCount++;
@@ -184,10 +204,8 @@ module.exports = async function deploy(workingDir) {
     progress.update(uploadCount + errorCount);
 
     // Remove this item from our remote objects map so we don't delete if we cleanup.
-    if (remoteObjects.has(remoteName)) {
-      const obj = remoteObjects.get(remoteName);
-      remoteObjects.delete(remoteName);
-      delete toDelete[fileNameHash(obj.name)];
+    if (remoteObjects.has(fileHashVal)) {
+      remoteObjects.delete(fileHashVal);
     }
   }
 
@@ -347,7 +365,6 @@ module.exports = async function deploy(workingDir) {
           });
 
         } catch(err) {
-          // console.log(`(${++count}/${entries.length}) Failed ${filePath}.`)
           console.log(err);
         }
 
@@ -360,8 +377,7 @@ module.exports = async function deploy(workingDir) {
 
   let deletedCount = 0;
   for (let [_id, obj] of remoteObjects) {
-    const hashedName = fileNameHash(obj.name);
-    console.log(hashedName)
+    const hashedName = cacheHash(obj.name, obj.buffer);
     toDelete[hashedName] = toDelete[hashedName] || NOW;
 
     // If file has been marked for deletion over three days ago, remove it from the server.
@@ -372,6 +388,15 @@ module.exports = async function deploy(workingDir) {
       delete toDelete[hashedName];
     }
   }
+
+  await upload({
+    buffer: await gzip(Buffer.from(JSON.stringify([...fileCache], null, 2)), { level: 8 }),
+    filePath: CACHE_FILENAME,
+    remoteName: path.join(BUCKET, CACHE_FILENAME),
+    contentType: 'application/json',
+    contentEncoding: 'gzip',
+    cacheControl: 'no-cache,no-store,max-age=0',
+  });
 
   await upload({
     buffer: await gzip(Buffer.from(JSON.stringify(toDelete, null, 2)), { level: 8 }),
