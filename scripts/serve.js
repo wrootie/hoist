@@ -13,7 +13,7 @@ module.exports = async function serve(root, usrPort=null, autoOpen=true){
   const port = await getPort({ port: usrPort || 3000 });
   const url = `http://localhost:${port}`;
 
-  app.listen(port, () => console.log(`Static site serving on port ${port}!`));
+  const server = app.listen(port, () => console.log(`Static site serving on port ${port}!`));
 
   if (autoOpen) {
     await open(`${url}${typeof autoOpen === 'string' ? autoOpen : ''}`);
@@ -23,6 +23,6 @@ module.exports = async function serve(root, usrPort=null, autoOpen=true){
     url,
     port,
     root,
-    stop: () => new Promise((resolve) => app.close(resolve)),
+    stop: () => new Promise((resolve) => server.close(resolve)),
   };
 }

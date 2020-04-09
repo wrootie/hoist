@@ -23,7 +23,8 @@ const progress = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classi
 
 const DELETE_FILENAME = '.hoist-delete';
 const CACHE_FILENAME = '.hoist-cache';
-const SYSTEM_FILES = new Set([DELETE_FILENAME, CACHE_FILENAME]);
+const CONFIG_FILENAME = 'gcloud.json';
+const SYSTEM_FILES = new Set([DELETE_FILENAME, CACHE_FILENAME, CONFIG_FILENAME]);
 
 const IMG_EXTS = {
   '.png': 'image/png',
@@ -117,7 +118,7 @@ function generateSourceMapFile(filePath, remoteName, content, BUCKET) {
 
 module.exports = async function deploy(workingDir, userBucket=null) {
 
-  const jsonKeyFile = await findUp('gcloud.json', { cwd: workingDir });
+  const jsonKeyFile = await findUp(CONFIG_FILENAME, { cwd: workingDir });
   const config = JSON.parse(fs.readFileSync(jsonKeyFile));
   const storage = client.new({ jsonKeyFile });
 
@@ -179,8 +180,10 @@ module.exports = async function deploy(workingDir, userBucket=null) {
   const hashes = {};
   const buffers = {};
 
+  // Fetch all our file buffers and content hashes, excluding Hoist system files.
   for (let filePath of files) {
     if (fs.statSync(filePath).isDirectory()) { continue; }
+    if (SYSTEM_FILES.has(path.basename(filePath))) { continue; }
     let file = path.relative(workingDir, filePath);
     buffers[file] = fs.readFileSync(filePath);
     hashes[file] = fileHash(buffers[file]);
