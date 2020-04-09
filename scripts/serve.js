@@ -16,7 +16,7 @@ module.exports = async function serve(root, usrPort=null, autoOpen=true){
   app.listen(port, () => console.log(`Static site serving on port ${port}!`));
 
   if (autoOpen) {
-    await open(url);
+    await open(`${url}${typeof autoOpen === 'string' ? autoOpen : ''}`);
   }
 
   return {
