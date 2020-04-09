@@ -1,8 +1,9 @@
 {
   "name": "@cannery/hoist",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "DIY Static Website Hosting",
   "main": "index.js",
+  "types": "types.d.ts",
   "repository": "git@github.com:amiller-gh/hoist.git",
   "author": "Adam Miller <adam@pages.me>",
   "license": "MIT",

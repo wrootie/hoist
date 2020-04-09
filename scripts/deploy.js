@@ -78,7 +78,6 @@ function cacheHash(fileName, buffer) {
     contentHash = md5toMd5url(buffer);
   }
 
-
   let hash = crypto.createHash('md5');
   hash.update(Buffer.from(fileName + contentHash));
   hash = hash.digest('base64');
@@ -397,22 +396,21 @@ module.exports = async function deploy(workingDir, userBucket=null) {
     }
   });
 
+  // If file has been marked for deletion over three days ago, remove it from the server.
   let deletedCount = 0;
   for (let [, obj] of remoteObjects) {
     const hashedName = obj.cacheHash;
-
-    // If file has been marked for deletion over three days ago, remove it from the server.
     if (toDelete[hashedName] && toDelete[hashedName] < (NOW - (1000 * 60 * 60 * 24 * 3))) {
       const object = await bucket.object(obj.name);
       await object.delete();
-      deletedCount++;
       delete toDelete[hashedName];
+      deletedCount++;
     }
   }
 
   progress.stop();
   console.log(`✅ ${uploadCount} items uploaded.`);
-  console.log(`⏺  ${noopCount} items already present.`)
+  console.log(`⏺  ${noopCount} items already present.`);
   console.log(`⌛ ${Object.keys(toDelete).length} items queued for deletion.`);
   console.log(`🚫 ${deletedCount} items deleted.`);
   console.log(`❗ ${errorCount} items failed.`);
