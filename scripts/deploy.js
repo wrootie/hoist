@@ -16,7 +16,6 @@ const cssnano = require('cssnano');
 const autoprefixer = require('autoprefixer')
 const Terser = require('terser');
 const htmlMinifier = require('html-minifier')
-const brotli = require('iltorb');
 const cliProgress = require('cli-progress');
 
 const progress = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
