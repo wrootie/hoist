@@ -115,9 +115,9 @@ function generateSourceMapFile(filePath, remoteName, content, BUCKET) {
   };
 }
 
-module.exports = async function deploy(workingDir, userBucket=null) {
+module.exports = async function deploy(root, directory='', userBucket=null) {
 
-  const jsonKeyFile = await findUp(CONFIG_FILENAME, { cwd: workingDir });
+  const jsonKeyFile = await findUp(CONFIG_FILENAME, { cwd: root });
   const config = JSON.parse(fs.readFileSync(jsonKeyFile));
   const storage = client.new({ jsonKeyFile });
 
@@ -156,7 +156,12 @@ module.exports = async function deploy(workingDir, userBucket=null) {
   for (let obj of await storage.list(BUCKET, { timeout: 520000 }) || []) {
 
     if (SYSTEM_FILES.has(obj.name)) { continue; }
+
     const remoteName = path.join(BUCKET, obj.name);
+
+    // Skip tracking remote files that aren't in our target upload directory.
+    if (remoteName.indexOf(path.join(BUCKET, directory)) !== 0) { continue; }
+
     const cacheName = cacheHash(remoteName, obj.md5Hash);
 
     toDelete[cacheName] = toDelete[cacheName] || NOW;
@@ -170,7 +175,7 @@ module.exports = async function deploy(workingDir, userBucket=null) {
     });
   }
 
-  const files = await glob(path.join(workingDir, '**/*'));
+  const files = await glob(path.join(root, directory, '**', '*'));
   let iter = 0;
   const THREAD_COUNT = 12;
   const threads = [];
@@ -183,7 +188,7 @@ module.exports = async function deploy(workingDir, userBucket=null) {
   for (let filePath of files) {
     if (fs.statSync(filePath).isDirectory()) { continue; }
     if (SYSTEM_FILES.has(path.basename(filePath))) { continue; }
-    let file = path.relative(workingDir, filePath);
+    let file = path.relative(root, filePath);
     buffers[file] = fs.readFileSync(filePath);
     hashes[file] = fileHash(buffers[file]);
   }

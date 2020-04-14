@@ -5,7 +5,7 @@ export interface HoistServer {
   async stop(): void;
 }
 
-export function deploy(workingDir: string, userBucket?: string): Promise<string>;
-export function makePublic(workingDir: string, userBucket?: string): Promise<void>;
-export function makePrivate(workingDir: string, userBucket?: string): Promise<void>;
-export function serve(workingDir: string, port?: number, autoOpen?: boolean | string): Promise<HoistServer>;
+export function deploy(root: string, directory?: string, bucket?: string): Promise<string>;
+export function makePublic(root: string, bucket?: string): Promise<void>;
+export function makePrivate(root: string, bucket?: string): Promise<void>;
+export function serve(root: string, port?: number, autoOpen?: boolean | string): Promise<HoistServer>;
