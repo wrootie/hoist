@@ -8,16 +8,11 @@ npm install -g @cannery/hoist
 ```
 
 Hoist understands, and automatically pre-processes for production, the following file types out of the box:
- - HTML
-   File URLs replaced with hashed CDN names and minified for production
- - CSS
-   File URLs replaced with hashed CDN names, autoprefixer applied with default settings, minified for production, and file name is hashed for CDN cache busting.
- - JavaScript
-   Minified for production and file name is hashed for CDN cache busting.
- - JPEG, PNG, GIF
-   Compressed, and file names are hashed for CDN cache busting.
- - SVG, Ico, BMP, WebP
-   File names are hashed for CDN cache busting
+ - **HTML**: URLs referenced replaced with hashed CDN names and minified for production
+ - **CSS**: File URLs replaced with hashed CDN names, autoprefixer applied with default settings, minified for production, and file name is hashed for CDN cache busting.
+ - **JavaScript**: Minified for production and file name is hashed for CDN cache busting.
+ - **JPEG, PNG, GIF**: Compressed, and file names are hashed for CDN cache busting.
+ - **SVG, Ico, BMP, WebP**: File names are hashed for CDN cache busting
 
 All other files discovered are uploaded as-is to the hosting provider. All files are gzipped as they are uploaded and appropriate cache-key headers are set. 
 
