@@ -25,19 +25,19 @@ All other files discovered are uploaded as-is to the hosting provider. All files
 Hoist comes with just two commands:
 
 ```bash
-$ hoist up [directory] [bucket_name]
+$ hoist up [root] [subdirectory] [bucket_name]
 $ hoist down
 $ hoist serve directory [port]
 ```
 
-`hoist up` will make your site public to the world. If you pass a directory as the second CLI argument it will upload that directory to your production site.
+`hoist up` will make your site public to the world. If you pass a directory root as the second CLI argument it will upload that directory to your production site. You can optionally pass a subdirectory to only upload that subdirectory to remote, and a bucket name other than the one specified in your `gcloud.json` auth file (see below) to select an alternate GCS bucket to upload to.
 
 `hoist down` will make your site private, nobody will be able to see files in the Google Storage Bucket.
 
 `hoist serve` will serve your site locally for you to preview. If you pass a preferred port Hoist will use the provided port if available.
 
 ## Configuration
-When you run Hoist from the CLI, it will crawl up directories until it finds a `hoist.json` file with the Service Account Key and attempt to use it for authentication.
+When you run Hoist from the CLI, it will crawl up directories until it finds a `gcloud.json` file with the Service Account Key and attempt to use it for authentication.
 
 Hoist needs a [Service Account](https://cloud.google.com/iam/docs/creating-managing-service-accounts) and a [Service Account Key](https://cloud.google.com/iam/docs/creating-managing-service-account-keys) with Storage Bucket management permissions to operate.
 
