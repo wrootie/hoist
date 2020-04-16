@@ -115,7 +115,7 @@ function generateSourceMapFile(filePath, remoteName, content, BUCKET) {
   };
 }
 
-module.exports = async function deploy(root, directory='', userBucket=null) {
+module.exports = async function deploy(root, directory='', userBucket=null, isCli=false) {
 
   const jsonKeyFile = await findUp(CONFIG_FILENAME, { cwd: root });
   const config = JSON.parse(fs.readFileSync(jsonKeyFile));
@@ -220,7 +220,7 @@ module.exports = async function deploy(root, directory='', userBucket=null) {
     // Do nothing if the file is already on the server, in the correct location, and unchanged.
     if (fileCache.has(hash)) {
       noopCount++;
-      progress.update(uploadCount + errorCount + noopCount);
+      isCli && progress.update(uploadCount + errorCount + noopCount);
       return;
     }
     fileCache.add(hash);
@@ -228,7 +228,7 @@ module.exports = async function deploy(root, directory='', userBucket=null) {
     // Upload it!
     await storage.insert(buffer, remoteName, opts).then(() => {
       uploadCount++;
-      progress.update(uploadCount + errorCount + noopCount);
+      isCli && progress.update(uploadCount + errorCount + noopCount);
     }, (err) => {
       console.error(err.message);
       errorCount++;
@@ -239,7 +239,7 @@ module.exports = async function deploy(root, directory='', userBucket=null) {
   const entries = Object.entries(buffers);
   await new Promise((resolve) => {
     const oldNames = Object.keys(hashes).sort((a, b) => a.length > b.length ? -1 : 1);
-    progress.start(entries.length, uploadCount + errorCount);
+    isCli && progress.start(entries.length, uploadCount + errorCount);
 
     for (let [filePath, buffer] of entries) {
       const hash = hashes[filePath];
@@ -415,7 +415,7 @@ module.exports = async function deploy(root, directory='', userBucket=null) {
     }
   }
 
-  progress.stop();
+  isCli && progress.stop();
   console.log(`✅ ${uploadCount} items uploaded.`);
   console.log(`⏺  ${noopCount} items already present.`);
   console.log(`⌛ ${Object.keys(toDelete).length} items queued for deletion.`);
