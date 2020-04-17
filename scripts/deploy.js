@@ -115,7 +115,7 @@ function generateSourceMapFile(filePath, remoteName, content, BUCKET) {
   };
 }
 
-module.exports = async function deploy(root, directory='', userBucket=null, isCli=false) {
+module.exports = async function deploy(root, directory='', userBucket=null, logger=false) {
 
   const jsonKeyFile = await findUp(CONFIG_FILENAME, { cwd: root });
   const config = JSON.parse(fs.readFileSync(jsonKeyFile));
@@ -123,6 +123,9 @@ module.exports = async function deploy(root, directory='', userBucket=null, isCl
 
   const BUCKET = userBucket || config.bucket;
   const NOW = Date.now();
+
+  const log = typeof logger !== 'boolean' ? logger : console;
+  const isCli = logger === true;
 
   if (!await storage.exists(BUCKET)) {
     await storage.bucket(BUCKET).create({ location: 'us-west1' });
@@ -230,7 +233,7 @@ module.exports = async function deploy(root, directory='', userBucket=null, isCl
       uploadCount++;
       isCli && progress.update(uploadCount + errorCount + noopCount);
     }, (err) => {
-      console.error(err.message);
+      log.error(err.message);
       errorCount++;
     });
 
@@ -393,10 +396,11 @@ module.exports = async function deploy(root, directory='', userBucket=null, isCl
           });
 
         } catch(err) {
-          console.log(err);
+          log.log(err);
         }
 
         // If this is the last to process, resolve.
+        log.log(uploadCount, errorCount, noopCount, uploadCount + errorCount + noopCount, entries.length);
         if ((uploadCount + errorCount + noopCount) === entries.length) { resolve(); }
       });
       iter++;
@@ -416,11 +420,11 @@ module.exports = async function deploy(root, directory='', userBucket=null, isCl
   }
 
   isCli && progress.stop();
-  console.log(`✅ ${uploadCount} items uploaded.`);
-  console.log(`⏺  ${noopCount} items already present.`);
-  console.log(`⌛ ${Object.keys(toDelete).length} items queued for deletion.`);
-  console.log(`🚫 ${deletedCount} items deleted.`);
-  console.log(`❗ ${errorCount} items failed.`);
+  log.log(`✅ ${uploadCount} items uploaded.`);
+  log.log(`⏺  ${noopCount} items already present.`);
+  log.log(`⌛ ${Object.keys(toDelete).length} items queued for deletion.`);
+  log.log(`🚫 ${deletedCount} items deleted.`);
+  log.log(`❗ ${errorCount} items failed.`);
 
   await upload({
     buffer: await gzip(Buffer.from(JSON.stringify([...fileCache], null, 2)), { level: 8 }),
