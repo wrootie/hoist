@@ -400,7 +400,6 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
         }
 
         // If this is the last to process, resolve.
-        log.log(uploadCount, errorCount, noopCount, uploadCount + errorCount + noopCount, entries.length);
         if ((uploadCount + errorCount + noopCount) === entries.length) { resolve(); }
       });
       iter++;

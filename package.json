@@ -24,7 +24,7 @@
     "html-minifier": "^4.0.0",
     "imagemin-gifsicle": "^6.0.1",
     "imagemin-mozjpeg": "^8.0.0",
-    "imagemin-pngquant": "amiller-gh/imagemin-pngquant#4830a8a",
+    "imagemin-pngquant": "^8.0.0",
     "imagemin-webp": "^5.1.0",
     "node-gzip": "^1.1.2",
     "open": "^7.0.2",
