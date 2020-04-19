@@ -8,7 +8,7 @@ if (args[0] === 'down') {
 }
 else if (args[0] === 'up') {
   if (args[1]) {
-    require('./scripts/deploy')(dir, args[2], '', null, true);
+    require('./scripts/deploy')(dir, args[2], '', true);
   }
   require('./scripts/make-public')(dir, args[2]);
 }

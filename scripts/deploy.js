@@ -85,13 +85,13 @@ function cacheHash(fileName, buffer) {
 }
 
 async function generateWebp(file, input, BUCKET) {
-  let remoteName = path.parse(path.join(BUCKET, file));
+  let remoteName = path.posix.parse(path.posix.join(BUCKET, file));
   remoteName.extname = '.webp';
-  const filePath = path.format(remoteName)
+  const filePath = path.posix.format(remoteName)
   const buffer = await imageminWebp({ quality: 75 })(input);
   remoteName.base = fileHash(buffer);
   delete remoteName.extname;
-  remoteName = path.format(remoteName);
+  remoteName = path.posix.format(remoteName);
   return {
     filePath,
     remoteName,
@@ -103,7 +103,7 @@ async function generateWebp(file, input, BUCKET) {
 }
 
 function generateSourceMapFile(filePath, remoteName, content, BUCKET) {
-  remoteName = path.join(BUCKET, remoteName) + '.map';
+  remoteName = path.posix.join(BUCKET, remoteName) + '.map';
   const buffer = Buffer.from(content);
   return {
     filePath,
@@ -149,8 +149,8 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
   let toDelete = {};
   let fileCache = new Set();
   try {
-    toDelete = await storage.get(path.join(BUCKET, DELETE_FILENAME));
-    fileCache = new Set(await storage.get(path.join(BUCKET, CACHE_FILENAME)));
+    toDelete = await storage.get(path.posix.join(BUCKET, DELETE_FILENAME));
+    fileCache = new Set(await storage.get(path.posix.join(BUCKET, CACHE_FILENAME)));
   } catch(_err) {}
   toDelete = toDelete || {};
   fileCache = fileCache && fileCache.size ? fileCache : new Set();
@@ -160,10 +160,10 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
 
     if (SYSTEM_FILES.has(obj.name)) { continue; }
 
-    const remoteName = path.join(BUCKET, obj.name);
+    const remoteName = path.posix.join(BUCKET, obj.name);
 
     // Skip tracking remote files that aren't in our target upload directory.
-    if (remoteName.indexOf(path.join(BUCKET, directory)) !== 0) { continue; }
+    if (remoteName.indexOf(path.posix.join(BUCKET, directory)) !== 0) { continue; }
 
     const cacheName = cacheHash(remoteName, obj.md5Hash);
 
@@ -178,7 +178,6 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
     });
   }
 
-  const files = await glob(path.join(root, directory, '**', '*'));
   let iter = 0;
   const THREAD_COUNT = 12;
   const threads = [];
@@ -188,10 +187,15 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
   const buffers = {};
 
   // Fetch all our file buffers and content hashes, excluding Hoist system files.
-  for (let filePath of files) {
+  // Use platform specific separator for filesystem access.
+  // We normalize this to posix paths for web below.
+  for (let filePath of await glob(path.join(root, directory, '**', '*'))) {
     if (fs.statSync(filePath).isDirectory()) { continue; }
     if (SYSTEM_FILES.has(path.basename(filePath))) { continue; }
-    let file = path.relative(root, filePath);
+    // Normalize the path on windows for web use.
+    const posixPath = path.posix.join(...filePath.split(path.sep));
+    const posixRoot = path.posix.join(...root.split(path.sep));
+    let file = path.posix.relative(posixRoot, posixPath);
     buffers[file] = fs.readFileSync(filePath);
     hashes[file] = fileHash(buffers[file]);
   }
@@ -246,7 +250,7 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
 
     for (let [filePath, buffer] of entries) {
       const hash = hashes[filePath];
-      const extname = path.extname(filePath);
+      const extname = path.posix.extname(filePath);
       const contentType = CONTENT_TYPE[extname] || 'application/json'
       let contentEncoding = undefined;
       let cacheControl = 'public,max-age=31536000,immutable';
@@ -254,7 +258,7 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
       threads[iter % THREAD_COUNT] = threads[iter % THREAD_COUNT].then(async () => {
         try {
           let remoteName = filePath;
-          remoteName = path.parse(remoteName);
+          remoteName = path.posix.parse(remoteName);
 
           if (remoteName.ext === '.html') {
             // Never cache HTML files.
@@ -298,12 +302,12 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
           if (extname === '.css' || extname === '.html') {
             for (let oldName of oldNames ) {
               const hash = hashes[oldName];
-              let hashName = path.parse(oldName);
+              let hashName = path.posix.parse(oldName);
               hashName.base = hash;
               delete hashName.extname;
-              hashName = path.format(hashName);
+              hashName = path.posix.format(hashName);
               buffer = replace(buffer, `/${oldName}`, `/${hashName}`);
-              const relativePath = path.relative(path.dirname(filePath), oldName);
+              const relativePath = path.posix.relative(path.posix.dirname(filePath), oldName);
               if (relativePath) {
                 buffer = replace(buffer, `./${relativePath}`, `/${hashName}`);
                 buffer = replace(buffer, relativePath, `/${hashName}`);
@@ -313,7 +317,7 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
 
           // Minify and upload sourcemaps for CSS resources.
           if (extname === '.css') {
-            const bareRemoteName = path.format(remoteName);
+            const bareRemoteName = path.posix.format(remoteName);
             const res = await postcss([autoprefixer, cssnano]).process(buffer, {
               from: filePath,
               to: bareRemoteName,
@@ -327,7 +331,7 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
 
           // Minify and upload sourcemaps for JS resources.
           if (extname === '.js') {
-            const bareRemoteName = path.format(remoteName);
+            const bareRemoteName = path.posix.format(remoteName);
             const res = Terser.minify(buffer.toString(), {
               toplevel: true,
               sourceMap: {
@@ -384,8 +388,8 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
           }
 
           // We have successfully computed our remote name!
-          remoteName = path.format(remoteName);
-          remoteName = path.join(BUCKET, remoteName);
+          remoteName = path.posix.format(remoteName);
+          remoteName = path.posix.join(BUCKET, remoteName);
           await upload({
             filePath,
             remoteName,
@@ -428,7 +432,7 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
   await upload({
     buffer: await gzip(Buffer.from(JSON.stringify([...fileCache], null, 2)), { level: 8 }),
     filePath: CACHE_FILENAME,
-    remoteName: path.join(BUCKET, CACHE_FILENAME),
+    remoteName: path.posix.join(BUCKET, CACHE_FILENAME),
     contentType: 'application/json',
     contentEncoding: 'gzip',
     cacheControl: 'no-cache,no-store,max-age=0',
@@ -437,7 +441,7 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
   await upload({
     buffer: await gzip(Buffer.from(JSON.stringify(toDelete, null, 2)), { level: 8 }),
     filePath: DELETE_FILENAME,
-    remoteName: path.join(BUCKET, DELETE_FILENAME),
+    remoteName: path.posix.join(BUCKET, DELETE_FILENAME),
     contentType: 'application/json',
     contentEncoding: 'gzip',
     cacheControl: 'no-cache,no-store,max-age=0',
