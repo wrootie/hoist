@@ -1740,9 +1740,10 @@ google-auto-auth@^0.10.1:
     google-auth-library "^1.3.1"
     request "^2.79.0"
 
-google-cloud-bucket@nicolasdao/google-cloud-bucket#e201dab:
-  version "0.15.4"
-  resolved "https://codeload.github.com/nicolasdao/google-cloud-bucket/tar.gz/e201dabc068f04e8a8c2d74a6f8b6e21d3a801a6"
+google-cloud-bucket@^0.15.5:
+  version "0.15.5"
+  resolved "https://registry.yarnpkg.com/google-cloud-bucket/-/google-cloud-bucket-0.15.5.tgz#4c3e1acb344e418e2545576477842b2e6ea69741"
+  integrity sha512-7HGPGyO/WxG4GaGzhjHM4EBu7DbC30BbdK1riT+d8ri2RsM3K6Nz8HZz/Ua3oq5tG2wSr/XTVF4Wcva73roXAA==
   dependencies:
     anymatch "^2.0.0"
     archiver "^3.0.0"
@@ -4244,10 +4245,10 @@ tempfile@^2.0.0:
     temp-dir "^1.0.0"
     uuid "^3.0.1"
 
-terser@^4.3.9:
-  version "4.6.7"
-  resolved "https://registry.yarnpkg.com/terser/-/terser-4.6.7.tgz#478d7f9394ec1907f0e488c5f6a6a9a2bad55e72"
-  integrity sha512-fmr7M1f7DBly5cX2+rFDvmGBAaaZyPrHYK4mMdHEDAdNTqXSZgSOfqsfGq2HqPGT/1V0foZZuCZFx8CHKgAk3g==
+terser@^4.7.0:
+  version "4.7.0"
+  resolved "https://registry.yarnpkg.com/terser/-/terser-4.7.0.tgz#15852cf1a08e3256a80428e865a2fa893ffba006"
+  integrity sha512-Lfb0RiZcjRDXCC3OSHJpEkxJ9Qeqs6mp2v4jf2MHfy8vGERmVDuvjXdd/EnP5Deme5F2yBRBymKmKHCBg2echw==
   dependencies:
     commander "^2.20.0"
     source-map "~0.6.1"
