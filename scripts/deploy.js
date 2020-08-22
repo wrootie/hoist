@@ -202,7 +202,8 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
   const buffers = {};
 
   try {
-    const globs = fs.readFileSync(preserveFile, 'utf8').split('\n');
+    const globs = [];
+    try { globs = fs.readFileSync(preserveFile, 'utf8').split('\n') } catch(_) {};
     for (let globPath of globs) {
       for (let filePath of await glob(path.join(preserveFile, '..', globPath))) {
         if (fs.statSync(filePath).isDirectory()) { continue; }
