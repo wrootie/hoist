@@ -126,7 +126,7 @@ function generateSourceMapFile(filePath, remoteName, content, BUCKET) {
 
 function shouldRewriteUrl(root, remoteName) {
   const filePath = path.posix.join(root, path.posix.format(remoteName));
-  return !WELL_KNOWN[remoteName.base] && !preserve[filePath] && filePath.indexOf('.well-known') !== 0 && remoteName.extname !== '.json';
+  return !WELL_KNOWN[remoteName.base] && !preserve[filePath] && filePath.indexOf('.well-known') !== 0 && remoteName.ext !== '.json';
 }
 
 module.exports = async function deploy(root, directory='', userBucket=null, logger=false, autoDelete = true) {
