@@ -11,7 +11,7 @@ export interface Logger {
   warn: (...any) => void;
 }
 
-export function deploy(root: string, directory?: string, bucket?: string, logger?: Logger): Promise<string>;
+export function deploy(root: string, directory?: string, bucket?: string, logger?: Logger, autoDelete?: boolean): Promise<string>;
 export function makePublic(root: string, bucket?: string): Promise<void>;
 export function makePrivate(root: string, bucket?: string): Promise<void>;
 export function serve(root: string, port?: number, autoOpen?: boolean | string): Promise<HoistServer>;
