@@ -295,7 +295,7 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
 
           if (remoteName.ext === '.html') {
             // Never cache HTML files.
-            cacheControl = 'must-revalidate';
+            cacheControl = 'public,max-age=0';
 
             // If an HTML file, but not the index.html, remove the `.html` for a bare URLs look in the browser.
             if (shouldRewriteUrl(root, remoteName)) {
@@ -333,7 +333,7 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
 
           // If we're not rewriting this URL to a hash, we need the cache to revalidate every time.
           else {
-            cacheControl = 'must-revalidate';
+            cacheControl = 'public,max-age=0';
           }
 
           // Replace all Hash names in CSS and HTML files.
