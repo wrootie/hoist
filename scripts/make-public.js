@@ -9,7 +9,7 @@ module.exports = async function up(cwd, userBucket=null){
   const config = JSON.parse(fs.readFileSync(jsonKeyFile));
   const storage = client.new({ jsonKeyFile });
 
-  const BUCKET = userBucket || config.bucket;
+  const BUCKET = (userBucket || config.bucket).toLowerCase();
 
   if (!await storage.exists(BUCKET)) {
     await storage.bucket(BUCKET).create({ location: 'us-west1' });

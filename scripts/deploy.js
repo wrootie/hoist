@@ -134,15 +134,21 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
   const jsonKeyFile = await findUp(CONFIG_FILENAME, { cwd: root });
   const preserveFile = await findUp(HOIST_PRESERVE, { cwd: root });
   const config = JSON.parse(fs.readFileSync(jsonKeyFile));
-  const storage = client.new({ jsonKeyFile });
+  config.project_id = config.projectId = process.env.PROJECT_ID || config.project_id || config.projectId;
+  const storage = client.new({
+    clientEmail: config.client_email || config.clientEmail,
+    privateKey: config.private_key || config.privateKey,
+    projectId: config.projectId
+  });
 
-  const BUCKET = userBucket || config.bucket;
+  const BUCKET = (userBucket || config.bucket).toLowerCase();
   const NOW = Date.now();
 
   const log = typeof logger !== 'boolean' ? logger : console;
   const isCli = logger === true;
 
   if (!await storage.exists(BUCKET)) {
+    log.log(`🕐 Creating bucket ${BUCKET}.`);
     await storage.bucket(BUCKET).create({ location: 'us-west1' });
   }
 
@@ -172,7 +178,6 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
 
   const remoteObjects = new Map();
   for (let obj of await storage.list(BUCKET, { timeout: 520000 }) || []) {
-
     if (SYSTEM_FILES.has(obj.name)) { continue; }
 
     const remoteName = path.posix.join(BUCKET, obj.name);
@@ -200,9 +205,8 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
 
   const hashes = {};
   const buffers = {};
-
   try {
-    const globs = [];
+    let globs = [];
     try { globs = fs.readFileSync(preserveFile, 'utf8').split('\n') } catch(_) {};
     for (let globPath of globs) {
       for (let filePath of await glob(path.join(preserveFile, '..', globPath))) {
@@ -291,7 +295,7 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
 
           if (remoteName.ext === '.html') {
             // Never cache HTML files.
-            cacheControl = 'no-cache,no-store,max-age=0';
+            cacheControl = 'must-revalidate';
 
             // If an HTML file, but not the index.html, remove the `.html` for a bare URLs look in the browser.
             if (shouldRewriteUrl(root, remoteName)) {
@@ -325,6 +329,11 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
           else if (shouldRewriteUrl(root, remoteName)) {
             remoteName.base = hash;
             delete remoteName.extname;
+          }
+
+          // If we're not rewriting this URL to a hash, we need the cache to revalidate every time.
+          else {
+            cacheControl = 'must-revalidate';
           }
 
           // Replace all Hash names in CSS and HTML files.

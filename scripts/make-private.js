@@ -9,7 +9,7 @@ module.exports = async function down(cwd, userBucket=null){
   const config = JSON.parse(fs.readFileSync(jsonKeyFile));
   const storage = client.new({ jsonKeyFile });
 
-  const BUCKET = userBucket || config.bucket;
+  const BUCKET = (userBucket || config.bucket).toLowerCase();
 
   let exists = await storage.exists(BUCKET);
   console.log(exists ? 'Bucket exists.' : 'Bucket does not exist.');
