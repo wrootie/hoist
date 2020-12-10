@@ -29,7 +29,7 @@ $ hoist serve directory [port]
 
 `hoist down` will make your site private, nobody will be able to see files in the Google Storage Bucket.
 
-`hoist serve` will serve your site locally for you to preview. If you pass a preferred port Hoist will use the provided port if available.
+`hoist serve` will serve your site locally over SSL for you to preview. If you pass a preferred port Hoist will use the provided port if available.
 
 ## Configuration
 When you run Hoist from the CLI, it will crawl up directories until it finds a `gcloud.json` file with the Service Account Key and attempt to use it for authentication.
@@ -37,6 +37,8 @@ When you run Hoist from the CLI, it will crawl up directories until it finds a `
 Hoist needs a [Service Account](https://cloud.google.com/iam/docs/creating-managing-service-accounts) and a [Service Account Key](https://cloud.google.com/iam/docs/creating-managing-service-account-keys) with Storage Bucket management permissions to operate.
 
 You may optionally include a [`cloudflare_token`](https://dash.cloudflare.com/profile/api-tokens) to automatically clear your CDN cache on upload. This token must be granted `Zone.Zone` read access and `Zone.Cache Purge` permissions for relevant DNS Zones.
+
+You may optionally include a `test_domain` to configure the local domain that `hoist serve` uses. By default it will make the site available at `https://hoist.test`.
 
 To configure the bucket that the site will upload to by default, add a single `bucket` field to this `gcloud.json` file with the target bucket name.
 
@@ -47,6 +49,7 @@ Once configured, your `gcloud.json` file should look something like this:
   "type": "service_account",
   "project_id": "projectid",
   "bucket": "bucketname.com",
+  "test_domain": "appname.test",
   "cloudflare_token": "01234567890123456789",
   "private_key_id": "01234567890123456789",
   "private_key": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",

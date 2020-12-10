@@ -1,9 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
 const findUp = require('find-up');
 const { gzip } = require('node-gzip');
-const { client } = require('google-cloud-bucket');
 const { promisify } = require('util');
 const glob = promisify(require('glob'));
 const replace = require('buffer-replace');
@@ -18,7 +16,8 @@ const Terser = require('terser');
 const htmlMinifier = require('html-minifier')
 const cliProgress = require('cli-progress');
 
-const progress = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+const initBucket = require('./initBucket');
+const { cdnFileName, hoistCacheName } = require('./fileHash');
 
 const HOIST_PRESERVE = '.hoist-preserve';
 const DELETE_FILENAME = '.hoist-delete';
@@ -55,38 +54,8 @@ const WELL_KNOWN = {
   '.well-known': true,
 }
 
+const progress = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
 let preserve = {};
-
-// https://tools.ietf.org/html/rfc4648#section-5
-function md5toMd5url(hash) {
-  return hash.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-}
-
-// Compute the original file's base64url encoded hash based on file contents.
-function fileHash(buffer) {
-  let hash = crypto.createHash('md5');
-  hash.update(buffer);
-  hash = hash.digest('base64');
-  return md5toMd5url(hash);
-}
-
-// Compute the original file's base64url encoded hash, with the file name included.
-function cacheHash(fileName, buffer) {
-  let contentHash;
-  if (typeof buffer !== 'string') {
-    contentHash = crypto.createHash('md5');
-    contentHash.update(buffer);
-    contentHash = md5toMd5url(contentHash.digest('base64'));
-  }
-  else {
-    contentHash = md5toMd5url(buffer);
-  }
-
-  let hash = crypto.createHash('md5');
-  hash.update(Buffer.from(fileName + contentHash));
-  hash = hash.digest('base64');
-  return md5toMd5url(hash);
-}
 
 async function generateWebp(file, input, BUCKET, root) {
   let remoteName = path.posix.parse(path.posix.join(BUCKET, file));
@@ -95,7 +64,7 @@ async function generateWebp(file, input, BUCKET, root) {
   const filePath = path.posix.format(remoteName)
   const buffer = await imageminWebp({ quality: 75 })(input);
   if (shouldRewrite) {
-    remoteName.base = fileHash(buffer);
+    remoteName.base = cdnFileName(buffer);
     delete remoteName.extname;
   }
   remoteName = path.posix.format(remoteName);
@@ -129,43 +98,15 @@ function shouldRewriteUrl(root, remoteName) {
   return !WELL_KNOWN[remoteName.base] && !preserve[filePath] && filePath.indexOf('.well-known') !== 0 && remoteName.ext !== '.json';
 }
 
-module.exports = async function deploy(root, directory='', userBucket=null, logger=false, autoDelete = true) {
-
+module.exports = async function deploy(root, directory='', userBucket=null, logger=false, autoDelete = false) {
+  const NOW = Date.now();
   const jsonKeyFile = await findUp(CONFIG_FILENAME, { cwd: root });
   const preserveFile = await findUp(HOIST_PRESERVE, { cwd: root });
   const config = JSON.parse(fs.readFileSync(jsonKeyFile));
-  config.project_id = config.projectId = process.env.PROJECT_ID || config.project_id || config.projectId;
-  const storage = client.new({
-    clientEmail: config.client_email || config.clientEmail,
-    privateKey: config.private_key || config.privateKey,
-    projectId: config.projectId
-  });
-
   const BUCKET = (userBucket || config.bucket).toLowerCase();
-  const NOW = Date.now();
-
   const log = typeof logger !== 'boolean' ? logger : console;
   const isCli = logger === true;
-
-  if (!await storage.exists(BUCKET)) {
-    log.log(`🕐 Creating bucket ${BUCKET}.`);
-    await storage.bucket(BUCKET).create({ location: 'us-west1' });
-  }
-
-  // CONFIGURE CORS ON A BUCKET (warning: Your service account must have the 'roles/storage.admin' role)
-  const bucket = storage.bucket(BUCKET);
-
-  await bucket.cors.setup({
-    origin: ['*'],
-    method: ['GET', 'OPTIONS', 'HEAD', 'POST'],
-    responseHeader: ['Authorization', 'Origin', 'X-Requested-With', 'Content-Type', 'Accept'],
-    maxAgeSeconds: 3600
-  });
-
-  await bucket.website.setup({
-    mainPageSuffix: 'index.html',
-    notFoundPage: '404.html',
-  });
+  const [storage, bucket] = await initBucket(config, BUCKET)
 
   let toDelete = {};
   let fileCache = new Set();
@@ -185,7 +126,7 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
     // Skip tracking remote files that aren't in our target upload directory.
     if (remoteName.indexOf(path.posix.join(BUCKET, directory)) !== 0) { continue; }
 
-    const cacheName = cacheHash(remoteName, obj.md5Hash);
+    const cacheName = hoistCacheName(remoteName, obj.md5Hash);
 
     toDelete[cacheName] = toDelete[cacheName] || NOW;
 
@@ -193,7 +134,6 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
       name: obj.name,
       remoteName,
       contentType: obj.contentType,
-      fileHash: md5toMd5url(obj.md5Hash),
       cacheHash: cacheName,
     });
   }
@@ -230,7 +170,7 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
     const posixRoot = path.posix.join(...root.split(path.sep));
     let file = path.posix.relative(posixRoot, posixPath);
     buffers[file] = fs.readFileSync(filePath);
-    hashes[file] = fileHash(buffers[file]);
+    hashes[file] = cdnFileName(buffers[file]);
   }
 
   let noopCount = 0;
@@ -253,7 +193,7 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
       headers,
     };
 
-    const hash = cacheHash(remoteName, buffer);
+    const hash = hoistCacheName(remoteName, buffer);
 
     // Remove this item from our remote objects map so we don't delete if we cleanup.
     delete toDelete[hash];
@@ -462,13 +402,15 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
 
   // If file has been marked for deletion over three days ago, remove it from the server.
   let deletedCount = 0;
-  for (let [, obj] of remoteObjects) {
-    const hashedName = obj.cacheHash;
-    if (autoDelete && toDelete[hashedName] && toDelete[hashedName] < (NOW - (1000 * 60 * 60 * 24 * 3))) {
-      const object = await bucket.object(obj.name);
-      await object.delete();
-      delete toDelete[hashedName];
-      deletedCount++;
+  if (autoDelete) {
+    for (let [, obj] of remoteObjects) {
+      const hashedName = obj.cacheHash;
+      if (toDelete[hashedName] && toDelete[hashedName] < (NOW - (1000 * 60 * 60 * 24 * 3))) {
+        const object = await bucket.object(obj.name);
+        await object.delete();
+        delete toDelete[hashedName];
+        deletedCount++;
+      }
     }
   }
 
