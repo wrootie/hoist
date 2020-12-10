@@ -310,7 +310,7 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
           // Minify and upload sourcemaps for JS resources.
           if (extname === '.js') {
             const bareRemoteName = path.posix.format(remoteName);
-            const res = Terser.minify(buffer.toString(), {
+            const res = await Terser.minify(buffer.toString(), {
               toplevel: true,
               ecma: '2017',
               sourceMap: {
@@ -318,10 +318,12 @@ module.exports = async function deploy(root, directory='', userBucket=null, logg
                 url: `/${bareRemoteName}.map`,
               }
             });
+
             // TODO: Don't upload if a minification fails!
             if (res.error) {
               throw new Error(res.error);
             }
+
             const sourceMap = generateSourceMapFile(filePath, bareRemoteName, res.map, BUCKET);
             entries.push([sourceMap.filePath, sourceMap.buffer])
             await upload(sourceMap);
