@@ -8,7 +8,7 @@ function md5toMd5url(hash) {
 
 // Compute the original file's base64url encoded hash based on file contents.
 exports.cdnFileName = function cdnFileName(buffer) {
-  if (typeof buffer === 'string') { buffer = fs.readFileSync(filePath); }
+  if (typeof buffer === 'string') { buffer = fs.readFileSync(buffer); }
   let hash = crypto.createHash('md5');
   hash.update(buffer);
   hash = hash.digest('base64');
