@@ -10,7 +10,7 @@ module.exports = async function initBucket(config, bucketName) {
   });
 
   if (!await storage.exists(bucketName)) {
-    log.log(`🕐 Creating bucket ${bucketName}.`);
+    console.log(`🕐 Creating bucket ${bucketName}.`);
     await storage.bucket(bucketName).create({ location: 'us-west1' });
   }
 
